@@ -127,29 +127,27 @@ function PostList(){
         <>
             <Header/>
             <div className="centered-column-item">
-                <div className="box">
-                    <div className="centered-row-item" style={{marginBottom:'10px'}}>
-                        <FormControl type="text"
-                                     value={keywordInput}
-                                     style={{backgroundColor:'#f4f4f4'}}
-                                     placeholder="검색어"
-                                     onChange={(event)=>{
-                                         setKeywordInput(event.target.value);
-                                     }}
-                        />
-                        <button type="button"
-                                className="btn"
-                                style={{fontSize:'20px', backgroundColor:'transparent'}}
-                                onClick={(event)=>{
-                                    event.target.disabled=true;
-                                    (async()=>{
-                                        const success=await search();
-                                        if(!success) event.target.disabled=false;
-                                    })();
-                                }}>
-                            <i className="fa-solid fa-magnifying-glass"></i>
-                        </button>
-                    </div>
+                <div className="centered-row-item" style={{marginTop:'10px', marginBottom:'8px', width:'600px'}}>
+                    <FormControl type="text"
+                                 value={keywordInput}
+                                 placeholder="검색어"
+                                 style={{height:'43px'}}
+                                 onChange={(event)=>{
+                                     setKeywordInput(event.target.value);
+                                 }}
+                    />
+                    <button type="button"
+                            className="btn"
+                            style={{fontSize:'20px', backgroundColor:'transparent'}}
+                            onClick={(event)=>{
+                                event.target.disabled=true;
+                                (async()=>{
+                                    const success=await search();
+                                    if(!success) event.target.disabled=false;
+                                })();
+                            }}>
+                        <i className="fa-solid fa-magnifying-glass"></i>
+                    </button>
                 </div>
 
                 {
