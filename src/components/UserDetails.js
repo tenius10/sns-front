@@ -4,6 +4,7 @@ import {useNavigate, useParams} from "react-router-dom";
 import Header from "./Header";
 import {FormControl} from "react-bootstrap";
 import {GlobalContext} from "./GlobalContext";
+import Modal from "react-bootstrap/Modal";
 
 
 
@@ -13,13 +14,30 @@ function UserDetails(){
     const { uid } = useParams();
     const {myInfo, setMyInfo}=useContext(GlobalContext);
 
+    //유저 페이지 정보
     const [userInfo, setUserInfo]=useState(null);
     const [postCount, setPostCount]=useState(0);
+    const [followerCount, setFollowerCount]=useState(0);
+    const [followingCount, setFollowingCount]=useState(0);
+    const [followed, setFollowed]=useState(false);
 
     const [postList, setPostList]=useState([]);
     const [postCursor, setPostCursor]=useState(null);
     const [hasNextPost, setHasNextPost]=useState(true);
 
+    //팔로워 목록
+    const [followerModalActive, setFollowerModalActive]=useState(false);
+    const [followerList, setFollowerList]=useState([]);
+    const [followerCursor, setFollowerCursor]=useState(null);
+    const [hasNextFollower, setHasNextFollower]=useState(true);
+
+    //팔로잉 목록
+    const [followingModalActive, setFollowingModalActive]=useState(false);
+    const [followingList, setFollowingList]=useState([]);
+    const [followingCursor, setFollowingCursor]=useState(null);
+    const [hasNextFollowing, setHasNextFollowing]=useState(true);
+
+    //프로필 수정
     const [modifyProfileModalActive, setModifyProfileModalActive]=useState(false);
     const profileInputField=useRef();
 
@@ -29,6 +47,7 @@ function UserDetails(){
     const [profilePreview, setProfilePreview] = useState(null);
     const [selectedProfile, setSelectedProfile]=useState(null);
     const [defaultProfile, setDefaultProfile]=useState(false);
+
 
 
     const showModifyProfileModal=()=>{
@@ -44,6 +63,31 @@ function UserDetails(){
         setDefaultProfile(false);
     };
 
+    const showFollowerModal=()=>{
+        loadFollowerList({baseList:[], cursor:null, hasNext:true});
+        setFollowerModalActive(true);
+    }
+
+    const closeFollowerModal=()=>{
+        setFollowerList([]);
+        setFollowerCursor(null);
+        setHasNextFollower(true);
+        setFollowerModalActive(false);
+    }
+
+    const showFollowingModal=()=>{
+        loadFollowingList({baseList:[], cursor:null, hasNext:true});
+        setFollowingModalActive(true);
+    }
+
+    const closeFollowingModal=()=>{
+        setFollowingList([]);
+        setFollowingCursor(null);
+        setHasNextFollowing(true);
+        setFollowingModalActive(false);
+    }
+
+
     const loadMyInfo=async()=>{
         await api.get('/api/users/me').then((result)=>{
             console.log("유저 조회 성공");
@@ -54,7 +98,7 @@ function UserDetails(){
     };
 
     const loadPostList=()=>{
-        api.get(`/api/users/${uid}/posts${postCursor!=null?'?cursor='+postCursor.pno:''}`).then((result)=>{
+        api.get(`/api/users/${userInfo.uid}/posts${postCursor!=null?'?cursor='+postCursor.pno:''}`).then((result)=>{
             console.log("게시글 조회 성공");
             const content=result.data.content;
             if(content.length > 0){
@@ -65,6 +109,38 @@ function UserDetails(){
         }).catch((error)=>{
             console.log("게시글 조회 실패 : "+error);
         })
+    };
+
+    const loadFollowerList=({baseList=followerList, cursor=followerCursor, hasNext=hasNextFollower})=>{
+        if(hasNext){
+            api.get(`/api/users/${userInfo.uid}/followers${cursor!=null?'?cursor='+cursor.uid:''}`).then((result)=>{
+                console.log("팔로워 목록 조회 성공!");
+                const content=result.data.content;
+                if(content.length > 0){
+                    setFollowerList(baseList.concat(content));
+                    setFollowerCursor(content[content.length-1]);
+                }
+                setHasNextFollower(result.data.hasNext);
+            }).catch((error)=>{
+                console.log("팔로워 목록 조회 실패 : "+error);
+            });
+        }
+    };
+
+    const loadFollowingList=({baseList=followingList, cursor=followingCursor, hasNext=hasNextFollowing})=>{
+        if(hasNext){
+            api.get(`/api/users/${userInfo.uid}/followings${cursor!=null?'?cursor='+cursor.uid:''}`).then((result)=>{
+                console.log("팔로워 목록 조회 성공!");
+                const content=result.data.content;
+                if(content.length > 0){
+                    setFollowingList(baseList.concat(content));
+                    setFollowingCursor(content[content.length-1]);
+                }
+                setHasNextFollowing(result.data.hasNext);
+            }).catch((error)=>{
+                console.log("팔로워 목록 조회 실패 : "+error);
+            });
+        }
     };
 
     const modifyUserInfo=async()=>{
@@ -93,7 +169,7 @@ function UserDetails(){
         }
 
         //회원 정보 수정
-        await api.put(`/api/users/${uid}`, {
+        await api.put(`/api/users/${userInfo.uid}`, {
             nickname:nicknameInput,
             profileName:profileName,
             intro:introInput
@@ -103,7 +179,7 @@ function UserDetails(){
             setUserInfo(result);
             loadMyInfo();
             closeModifyProfileModal();
-            loadUserPage(uid);
+            loadUserPage(userInfo.uid);
         }).catch((error)=>{
             console.log("프로필 수정 실패 : "+error);
         });
@@ -118,6 +194,9 @@ function UserDetails(){
             if(userPage){
                 setUserInfo(userPage.userInfo);
                 setPostCount(userPage.postCount);
+                setFollowerCount(userPage.followerCount);
+                setFollowingCount(userPage.followingCount);
+                setFollowed(userPage.followed);
                 if(userPage.postPage){
                     const content=userPage.postPage.content;
                     if(content.length > 0){
@@ -127,7 +206,6 @@ function UserDetails(){
                     setHasNextPost(userPage.postPage.hasNext);
                 }
             }
-
         }).catch((error)=>{
             console.log("유저 페이지 조회 실패 : "+error);
         });
@@ -149,6 +227,32 @@ function UserDetails(){
         } else {
             setProfilePreview(null);
         }
+    };
+
+    const follow=async(uid)=>{
+        let success=false;
+
+        await api.post(`/api/users/${uid}/follow`).then((result)=>{
+            console.log("팔로우 성공!");
+            success=true;
+        }).catch((error)=>{
+            console.log("팔로우 실패 : "+error);
+        });
+
+        return success;
+    };
+
+    const unfollow=async(uid)=>{
+        let success=false;
+
+        await api.delete(`/api/users/${uid}/follow`).then((result)=>{
+            console.log("언팔로우 성공!");
+            success=true;
+        }).catch((error)=>{
+            console.log("언팔로우 실패 : "+error);
+        });
+
+        return success;
     };
 
     useEffect(()=>{
@@ -294,11 +398,17 @@ function UserDetails(){
                                                     <div className="color-gray">게시글</div>
                                                 </div>
                                                 <div className="centered-column-item">
-                                                    <div style={{fontSize:'24px'}}>0</div>
+                                                    <div style={{fontSize:'24px'}}
+                                                         onClick={showFollowerModal}>
+                                                        {followerCount}
+                                                    </div>
                                                     <div className="color-gray">팔로워</div>
                                                 </div>
                                                 <div className="centered-column-item">
-                                                    <div style={{fontSize:'24px'}}>0</div>
+                                                    <div style={{fontSize:'24px'}}
+                                                         onClick={showFollowingModal}>
+                                                        {followingCount}
+                                                    </div>
                                                     <div className="color-gray">팔로우</div>
                                                 </div>
                                             </div>
@@ -309,7 +419,7 @@ function UserDetails(){
                                         </div>
                                         {
                                             myInfo && userInfo && (myInfo.uid === userInfo.uid) &&
-                                            <div style={{marginLeft:'5px'}}>
+                                            <div style={{marginLeft:'5px', marginBottom:'8px'}}>
                                                 <button className="btn btn-outline-secondary"
                                                         style={{width:'49%', marginRight:'6px'}}
                                                         onClick={showModifyProfileModal}>
@@ -319,6 +429,31 @@ function UserDetails(){
                                                         style={{width:'49%'}}>
                                                     계정 관리
                                                 </button>
+                                            </div>
+                                        }
+                                        {
+                                            (myInfo.uid != userInfo.uid) &&
+                                            <div style={{marginBottom:'8px'}}>
+                                                {
+                                                    followed?
+                                                        <button className="btn btn-outline-secondary text-bold"
+                                                                style={{width:'100%'}}
+                                                                onClick={async()=>{
+                                                                    const success=await unfollow(userInfo.uid);
+                                                                    if(success) loadUserPage(userInfo.uid);
+                                                                }}>
+                                                            언팔로우
+                                                        </button>
+                                                        :
+                                                        <button className="btn btn-primary text-bold"
+                                                                style={{width:'100%'}}
+                                                                onClick={async()=>{
+                                                                    const success=await follow(userInfo.uid);
+                                                                    if(success) loadUserPage(userInfo.uid);
+                                                                }}>
+                                                            팔로우
+                                                        </button>
+                                                }
                                             </div>
                                         }
                                     </div>
@@ -384,6 +519,166 @@ function UserDetails(){
                 }
             </div>
 
+            <Modal show={followerModalActive}
+                   onHide={closeFollowerModal}
+                   centered>
+                <Modal.Header style={{height:'66px'}}>
+                    <div className="text-bold" style={{fontSize:'18px'}}>팔로워 ({followerCount})</div>
+                </Modal.Header>
+                <Modal.Body>
+                    <div style={{minHeight:'500px'}}>
+                        {
+                            followerList.slice().map((follower, idx)=>{
+                                return (
+                                    <div className="box" key={idx} style={{width:'100%', border:'solid 1px lightGray', paddingTop:'15px',paddingBottom:'15px'}}>
+                                        <div className="centered-row-item">
+                                            <div className="centered-row-item" style={{width:'75%'}}>
+                                                <div style={{marginRight:'20px'}}>
+                                                    <img className="round-border"
+                                                         style={{width:'60px', height:'60px'}}
+                                                         src={`http://localhost:8080/api/files/${follower.profileName}`}
+                                                         onClick={()=>{navigate(`/user/${follower.uid}`)}}
+                                                    />
+                                                </div>
+                                                <div style={{marginRight:'20px'}}>
+                                                    <div className="text-bold" style={{fontSize:'17px'}}>{follower.nickname}</div>
+                                                    <div style={{fontSize:'14px'}}>{follower.intro.length>30?follower.intro.slice(0, 30)+'...':follower.intro}</div>
+                                                </div>
+                                            </div>
+                                            <div style={{width:'25%'}}>
+                                                {
+                                                    (myInfo.uid != follower.uid) &&
+                                                    <>
+                                                        {
+                                                            follower.followed?
+                                                                <button className="btn btn-outline-secondary text-bold float-end"
+                                                                        style={{width:'90px', fontSize:'15px'}}
+                                                                        onClick={async()=>{
+                                                                            const success=await unfollow(follower.uid);
+                                                                            if(success) {
+                                                                                setFollowerList(followerList.slice().map((item, index)=>{
+                                                                                    if(index==idx) {
+                                                                                        item.followed=false;
+                                                                                    }
+                                                                                    return item;
+                                                                                }))
+                                                                            }
+                                                                        }}>
+                                                                    언팔로우
+                                                                </button>
+                                                                :
+                                                                <button className="btn btn-primary text-bold float-end"
+                                                                        style={{width:'80px', fontSize:'15px'}}
+                                                                        onClick={async()=>{
+                                                                            const success=await follow(follower.uid);
+                                                                            if(success) {
+                                                                                setFollowerList(followerList.slice().map((item, index)=>{
+                                                                                    if(index==idx) {
+                                                                                        item.followed=true;
+                                                                                    }
+                                                                                    return item;
+                                                                                }))
+                                                                            }
+                                                                        }}>
+                                                                    팔로우
+                                                                </button>
+                                                        }
+                                                    </>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        }
+                        {
+                            hasNextFollower &&
+                            <button className="btn btn-outline-secondary" style={{width:'100%'}} onClick={loadFollowerList}>더 보기</button>
+                        }
+                    </div>
+                </Modal.Body>
+            </Modal>
+
+
+            <Modal show={followingModalActive}
+                   onHide={closeFollowingModal}
+                   centered>
+                <Modal.Header style={{height:'66px'}}>
+                    <div className="text-bold" style={{fontSize:'18px'}}>팔로우 ({followingCount})</div>
+                </Modal.Header>
+                <Modal.Body>
+                    <div style={{minHeight:'500px'}}>
+                        {
+                            followingList.slice().map((following, idx)=>{
+                                return (
+                                    <div className="box" key={idx} style={{width:'100%', border:'solid 1px lightGray', paddingTop:'15px',paddingBottom:'15px'}}>
+                                        <div className="centered-row-item">
+                                            <div className="centered-row-item" style={{width:'75%'}}>
+                                                <div style={{marginRight:'20px'}}>
+                                                    <img className="round-border"
+                                                         style={{width:'60px', height:'60px'}}
+                                                         src={`http://localhost:8080/api/files/${following.profileName}`}
+                                                         onClick={()=>{navigate(`/user/${following.uid}`)}}
+                                                    />
+                                                </div>
+                                                <div className="" style={{marginRight:'20px'}}>
+                                                    <div className="text-bold" style={{fontSize:'17px'}}>{following.nickname}</div>
+                                                    <div style={{fontSize:'14px'}}>{following.intro.length>30?following.intro.slice(0, 30)+'...':following.intro}</div>
+                                                </div>
+                                            </div>
+                                            <div style={{width:'25%'}}>
+                                                {
+                                                    (myInfo.uid != following.uid) &&
+                                                    <>
+                                                        {
+                                                            following.followed?
+                                                                <button className="btn btn-outline-secondary text-bold float-end"
+                                                                        style={{width:'90px', fontSize:'15px'}}
+                                                                        onClick={async()=>{
+                                                                            const success=await unfollow(following.uid);
+                                                                            if(success) {
+                                                                                setFollowingList(followingList.slice().map((item, index)=>{
+                                                                                    if(index==idx) {
+                                                                                        item.followed=false;
+                                                                                    }
+                                                                                    return item;
+                                                                                }))
+                                                                            }
+                                                                        }}>
+                                                                    언팔로우
+                                                                </button>
+                                                                :
+                                                                <button className="btn btn-primary text-bold float-end"
+                                                                        style={{width:'80px', fontSize:'15px'}}
+                                                                        onClick={async()=>{
+                                                                            const success=await follow(following.uid);
+                                                                            if(success) {
+                                                                                setFollowingList(followingList.slice().map((item, index)=>{
+                                                                                    if(index==idx) {
+                                                                                        item.followed=true;
+                                                                                    }
+                                                                                    return item;
+                                                                                }))
+                                                                            }
+                                                                        }}>
+                                                                    팔로우
+                                                                </button>
+                                                        }
+                                                    </>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        }
+                        {
+                            hasNextFollowing &&
+                            <button className="btn btn-outline-secondary" style={{width:'100%'}} onClick={loadFollowingList}>더 보기</button>
+                        }
+                    </div>
+                </Modal.Body>
+            </Modal>
         </>
     );
 }

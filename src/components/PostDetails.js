@@ -22,6 +22,7 @@ function PostDetails(){
     const [modifyPostActive, setModifyPostActive]=useState(false);
     const [selectedComment, setSelectedComment]=useState(null);
 
+    const fileInputField=useRef();
     const modifyPostBtn=useRef();
     const deletePostBtn=useRef();
     const createCommentBtn=useRef();
@@ -237,7 +238,26 @@ function PostDetails(){
      * @returns {Promise<void>}
      */
     const unselectFile=async(idx)=>{
-        setUploadedFileNames(uploadedFileNames.filter((fileName, i) => i !== idx));
+        let success=false;
+
+        //서버에서 파일 삭제
+        const fileName=uploadedFileNames[idx];
+        if(!post.fileNames.includes(fileName)){
+            //수정 전에 있던 파일이 아니라 수정창에서 방금 선택한 파일이면 삭제해도 됨
+            await api.delete(`/api/files/${fileName}`).then((result)=>{
+                console.log("첨부파일 삭제 성공!");
+                setUploadedFileNames(uploadedFileNames.filter((fileName, i) => i !== idx));
+                success=true;
+            }).catch((error)=>{
+                console.log("첨부파일 삭제 실패 : " + error);
+            });
+        }
+        else{
+            //수정 전에 있던 파일인 경우, 수정 작업을 취소하면 여전히 남아있어야 해서 아직 삭제하면 안 됨.
+            setUploadedFileNames(uploadedFileNames.filter((fileName, i) => i !== idx));
+        }
+
+        return success;
     };
 
     useEffect(()=>{
@@ -261,19 +281,27 @@ function PostDetails(){
                                             <i className="fa-solid fa-arrow-left color-dark"></i>
                                         </button>
                                         <div className="text-bold centered-item" style={{fontSize:'18px'}}>게시글 수정</div>
-                                        <button type="button"
-                                                className="btn float-end"
-                                                ref={modifyPostBtn}
-                                                style={{fontSize:'19px', backgroundColor:'transparent'}}
-                                                onClick={(event)=>{
-                                                    event.target.disabled=true;
-                                                    (async()=>{
-                                                        const success=await modifyPost();
-                                                        if(!success) event.target.disabled=false;
-                                                    })();
-                                                }}>
-                                            <i className="fa-solid fa-paper-plane color-dark"></i>
-                                        </button>
+                                        <div className="centered-row-item">
+                                            <button type="button"
+                                                    className="btn float-end"
+                                                    style={{fontSize:'19px', marginTop:'5px', backgroundColor:'transparent'}}
+                                                    onClick={()=>{fileInputField.current.click();}}>
+                                                <i className="fa-solid fa-paperclip color-dark"></i>
+                                            </button>
+                                            <button type="button"
+                                                    className="btn float-end"
+                                                    ref={modifyPostBtn}
+                                                    style={{fontSize:'19px', backgroundColor:'transparent'}}
+                                                    onClick={(event)=>{
+                                                        event.target.disabled=true;
+                                                        (async()=>{
+                                                            const success=await modifyPost();
+                                                            if(!success) event.target.disabled=false;
+                                                        })();
+                                                    }}>
+                                                <i className="fa-solid fa-paper-plane color-dark"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <hr/>
                                     <div className="justify-between" style={{marginBottom:'10px'}}>
@@ -316,7 +344,11 @@ function PostDetails(){
                                             })
                                         )}
                                     </div>
-                                    <input type="file" multiple onChange={selectFile}/>
+                                    <input type="file"
+                                           ref={fileInputField}
+                                           style={{display:'none'}}
+                                           onChange={selectFile}
+                                    />
                                 </div>
                             </>
                             :
@@ -424,7 +456,8 @@ function PostDetails(){
                                                              value={createCommentContent}
                                                              onChange={(event)=>{
                                                                  setCreateCommentContent(event.target.value);
-                                                             }}/>
+                                                             }}
+                                                />
                                                 <button type="button"
                                                         className="btn float-end"
                                                         ref={createCommentBtn}
@@ -464,26 +497,29 @@ function PostDetails(){
                                                                             <div className="color-light-gray" style={{fontSize:'15px', marginTop:'6px'}}>{comment.regDate}</div>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="float-end">
-                                                                        <button className="btn"
-                                                                                style={{fontSize:'18px', backgroundColor:'transparent'}}
-                                                                                onClick={()=>{
-                                                                                    showModifyComment(comment);
-                                                                                }}>
-                                                                            <i className="fa-regular fa-pen-to-square color-dark"></i>
-                                                                        </button>
-                                                                        <button className="btn"
-                                                                                style={{fontSize:'18px', backgroundColor:'transparent'}}
-                                                                                onClick={(event)=>{
-                                                                                    event.target.disabled=true;
-                                                                                    (async()=>{
-                                                                                        const success=await deleteComment(comment.cno);
-                                                                                        if(!success) event.target.disabled=false;
-                                                                                    })();
-                                                                                }}>
-                                                                            <i className="fa-solid fa-trash color-dark"></i>
-                                                                        </button>
-                                                                    </div>
+                                                                    {
+                                                                        comment.owned &&
+                                                                        <div className="float-end">
+                                                                            <button className="btn"
+                                                                                    style={{fontSize:'18px', backgroundColor:'transparent'}}
+                                                                                    onClick={()=>{
+                                                                                        showModifyComment(comment);
+                                                                                    }}>
+                                                                                <i className="fa-regular fa-pen-to-square color-dark"></i>
+                                                                            </button>
+                                                                            <button className="btn"
+                                                                                    style={{fontSize:'18px', backgroundColor:'transparent'}}
+                                                                                    onClick={(event)=>{
+                                                                                        event.target.disabled=true;
+                                                                                        (async()=>{
+                                                                                            const success=await deleteComment(comment.cno);
+                                                                                            if(!success) event.target.disabled=false;
+                                                                                        })();
+                                                                                    }}>
+                                                                                <i className="fa-solid fa-trash color-dark"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    }
                                                                 </div>
                                                                 <div style={{marginLeft:'60px'}}>
                                                                     <div style={{fontSize:'16px', marginTop:'10px', marginBottom:'15px'}}>{comment.content}</div>

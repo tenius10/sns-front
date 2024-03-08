@@ -109,13 +109,14 @@ function PostList(){
         //서버에서 파일 삭제
         const fileName=uploadedFiles[idx].link;
         await api.delete(`/api/files/${fileName}`).then((result)=>{
-            const data=result.data;
             console.log("첨부파일 삭제 성공!");
             setUploadedFiles(uploadedFiles.filter((file, i) => i !== idx));
             success=true;
         }).catch((error)=>{
             console.log("첨부파일 삭제 실패 : " + error);
         });
+
+        return success;
     };
 
     useEffect(()=>{
