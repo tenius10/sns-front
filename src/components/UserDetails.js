@@ -97,12 +97,31 @@ function UserDetails(){
         })
     };
 
-    const loadPostList=()=>{
-        api.get(`/api/users/${userInfo.uid}/posts${postCursor!=null?'?cursor='+postCursor.pno:''}`).then((result)=>{
+    const loadUserPage=(uid)=>{
+        if(!uid) return;
+        api.get(`/api/users/${uid}`).then((result)=>{
+            console.log("유저 페이지 조회 성공");
+            const userPage=result.data;
+            if(userPage){
+                setUserInfo(userPage.userInfo);
+                setPostCount(userPage.postCount);
+                setFollowerCount(userPage.followerCount);
+                setFollowingCount(userPage.followingCount);
+                setFollowed(userPage.followed);
+            }
+        }).catch((error)=>{
+            console.log("유저 페이지 조회 실패 : "+error);
+        });
+    };
+
+    const loadPostList=({baseList=postList, cursor=postCursor, hasNext=hasNextPost})=>{
+        if(!uid) return;
+        if(!hasNext) return;
+        api.get(`/api/users/${uid}/posts${cursor!=null?'?cursor='+cursor.pno:''}`).then((result)=>{
             console.log("게시글 조회 성공");
             const content=result.data.content;
             if(content.length > 0){
-                setPostList(postList.concat(content));
+                setPostList(baseList.concat(content));
                 setPostCursor(content[content.length-1]);
             }
             setHasNextPost(result.data.hasNext);
@@ -112,8 +131,9 @@ function UserDetails(){
     };
 
     const loadFollowerList=({baseList=followerList, cursor=followerCursor, hasNext=hasNextFollower})=>{
+        if(!uid) return;
         if(hasNext){
-            api.get(`/api/users/${userInfo.uid}/followers${cursor!=null?'?cursor='+cursor.uid:''}`).then((result)=>{
+            api.get(`/api/users/${uid}/followers${cursor!=null?'?cursor='+cursor.uid:''}`).then((result)=>{
                 console.log("팔로워 목록 조회 성공!");
                 const content=result.data.content;
                 if(content.length > 0){
@@ -128,8 +148,9 @@ function UserDetails(){
     };
 
     const loadFollowingList=({baseList=followingList, cursor=followingCursor, hasNext=hasNextFollowing})=>{
+        if(!uid) return;
         if(hasNext){
-            api.get(`/api/users/${userInfo.uid}/followings${cursor!=null?'?cursor='+cursor.uid:''}`).then((result)=>{
+            api.get(`/api/users/${uid}/followings${cursor!=null?'?cursor='+cursor.uid:''}`).then((result)=>{
                 console.log("팔로워 목록 조회 성공!");
                 const content=result.data.content;
                 if(content.length > 0){
@@ -145,8 +166,10 @@ function UserDetails(){
 
     const modifyUserInfo=async()=>{
         let success=false;
-        let profileName=null;
 
+        if(!myInfo) return success;
+
+        let profileName=null;
         const uploadFile=selectedProfile;
         if(uploadFile){
             //프로필 사진을 변경했으면, 서버에 파일 업로드
@@ -169,7 +192,7 @@ function UserDetails(){
         }
 
         //회원 정보 수정
-        await api.put(`/api/users/${userInfo.uid}`, {
+        await api.put(`/api/users/${myInfo.uid}`, {
             nickname:nicknameInput,
             profileName:profileName,
             intro:introInput
@@ -180,35 +203,12 @@ function UserDetails(){
             loadMyInfo();
             closeModifyProfileModal();
             loadUserPage(userInfo.uid);
+            loadPostList({baseList:[], cursor:null, hasNext:true});
         }).catch((error)=>{
             console.log("프로필 수정 실패 : "+error);
         });
 
         return success;
-    };
-
-    const loadUserPage=(uid)=>{
-        api.get(`/api/users/${uid}`).then((result)=>{
-            console.log("유저 페이지 조회 성공");
-            const userPage=result.data;
-            if(userPage){
-                setUserInfo(userPage.userInfo);
-                setPostCount(userPage.postCount);
-                setFollowerCount(userPage.followerCount);
-                setFollowingCount(userPage.followingCount);
-                setFollowed(userPage.followed);
-                if(userPage.postPage){
-                    const content=userPage.postPage.content;
-                    if(content.length > 0){
-                        setPostList(content);
-                        setPostCursor(content[content.length-1]);
-                    }
-                    setHasNextPost(userPage.postPage.hasNext);
-                }
-            }
-        }).catch((error)=>{
-            console.log("유저 페이지 조회 실패 : "+error);
-        });
     };
 
     const selectFile=async(event) => {
@@ -231,6 +231,7 @@ function UserDetails(){
 
     const follow=async(uid)=>{
         let success=false;
+        if(!uid) return success;
 
         await api.post(`/api/users/${uid}/follow`).then((result)=>{
             console.log("팔로우 성공!");
@@ -244,6 +245,7 @@ function UserDetails(){
 
     const unfollow=async(uid)=>{
         let success=false;
+        if(!uid) return;
 
         await api.delete(`/api/users/${uid}/follow`).then((result)=>{
             console.log("언팔로우 성공!");
@@ -257,6 +259,7 @@ function UserDetails(){
 
     useEffect(()=>{
         loadUserPage(uid);
+        loadPostList({baseList:[], cursor:null, hasNext:true});
     },[uid]);
 
     return (
@@ -418,7 +421,7 @@ function UserDetails(){
                                             <div>{userInfo.intro}</div>
                                         </div>
                                         {
-                                            myInfo && userInfo && (myInfo.uid === userInfo.uid) &&
+                                            myInfo && (myInfo.uid === userInfo.uid) &&
                                             <div style={{marginLeft:'5px', marginBottom:'8px'}}>
                                                 <button className="btn btn-outline-secondary"
                                                         style={{width:'49%', marginRight:'6px'}}
@@ -432,7 +435,7 @@ function UserDetails(){
                                             </div>
                                         }
                                         {
-                                            (myInfo.uid != userInfo.uid) &&
+                                            myInfo && (myInfo.uid != userInfo.uid) &&
                                             <div style={{marginBottom:'8px'}}>
                                                 {
                                                     followed?
@@ -547,7 +550,7 @@ function UserDetails(){
                                             </div>
                                             <div style={{width:'25%'}}>
                                                 {
-                                                    (myInfo.uid != follower.uid) &&
+                                                    myInfo && (myInfo.uid != follower.uid) &&
                                                     <>
                                                         {
                                                             follower.followed?
@@ -628,7 +631,7 @@ function UserDetails(){
                                             </div>
                                             <div style={{width:'25%'}}>
                                                 {
-                                                    (myInfo.uid != following.uid) &&
+                                                    myInfo && (myInfo.uid != following.uid) &&
                                                     <>
                                                         {
                                                             following.followed?

@@ -12,7 +12,7 @@ function PostDetails(){
     const [post, setPost]=useState(null);
     const [commentList, setCommentList]=useState([]);
     const [commentCursor, setCommentCursor]=useState(null);
-    const [hasNextComment, setHasNextComment]=useState(false);
+    const [hasNextComment, setHasNextComment]=useState(true);
 
     const [postContent, setPostContent]=useState("");
     const [uploadedFileNames, setUploadedFileNames] = useState([]);
@@ -58,10 +58,6 @@ function PostDetails(){
         api.get("/api/posts/"+pno).then((result)=>{
             console.log("게시글 조회 성공");
             setPost(result.data);
-            const commentList=result.data.commentPage.content;
-            setCommentList(commentList);
-            setCommentCursor(commentList[commentList.length-1]);
-            setHasNextComment(result.data.commentPage.hasNext);
         }).catch((error)=>{
             console.log("게시글 조회 실패 : "+error);
         })
@@ -76,13 +72,7 @@ function PostDetails(){
         }).then((result)=>{
             console.log("게시글 수정 성공");
             success=true;
-
             setPost(result.data);
-            const commentList=result.data.commentPage.content;
-            setCommentList(commentList);
-            setCommentCursor(commentList[commentList.length-1]);
-            setHasNextComment(result.data.commentPage.hasNext);
-
             setModifyPostActive(false);
         }).catch((error)=>{
             console.log("게시글 수정 실패 : " + error);
@@ -123,8 +113,8 @@ function PostDetails(){
         });
     };
 
-    const loadCommentList=async({baseList=commentList, size = commentPageSize, cursor = commentCursor})=>{
-        if(!hasNextComment) return;
+    const loadCommentList=async({baseList=commentList, size = commentPageSize, cursor = commentCursor, hasNext=hasNextComment})=>{
+        if(!hasNext) return;
         await api.get(`/api/posts/${pno}/comments?size=${size}${cursor!=null?("&cursor="+cursor.cno):""}`).then((result)=>{
             console.log("댓글 목록 조회 성공");
             const content=result.data.content;
@@ -146,6 +136,7 @@ function PostDetails(){
             console.log("댓글 등록 성공");
             success=true;
             loadPost(pno);
+            loadCommentList({baseList:[], cursor:null, hasNext:true});
             setCreateCommentContent("");
         }).catch((error)=>{
             console.log("댓글 등록 실패 : " + error);
@@ -166,6 +157,7 @@ function PostDetails(){
             console.log("댓글 수정 성공");
             success=true;
             loadPost(pno);
+            loadCommentList({baseList:[], cursor:null, hasNext:true});
             setSelectedComment(null);
         }).catch((error)=>{
             console.log("댓글 수정 실패 : " + error);
@@ -182,6 +174,7 @@ function PostDetails(){
             console.log("댓글 삭제 성공");
             success=true;
             loadPost(pno);
+            loadCommentList({baseList:[], cursor:null, hasNext:true});
         }).catch((error)=>{
             console.log("댓글 삭제 실패 : "+error);
         });
@@ -262,6 +255,7 @@ function PostDetails(){
 
     useEffect(()=>{
         loadPost(pno);
+        loadCommentList({baseList:[], cursor:null, hasNext:true});
     },[pno]);
 
     return (
